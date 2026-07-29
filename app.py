@@ -7,8 +7,9 @@ from pathlib import Path
 from sklearn.metrics import mean_absolute_error, r2_score
 
 WINDOW = 365
-CSV_PATH = "PV_Elec_Gas3.csv"
-MODEL_PATH = Path("models/solar_forecast.keras")
+BASE_DIR = Path(__file__).resolve().parent
+CSV_PATH = BASE_DIR / "PV_Elec_Gas3.csv"
+MODEL_PATH = BASE_DIR / "models" / "solar_forecast.keras"
 
 st.set_page_config(page_title="Solar Power Forecast", layout="wide")
 st.title("Solar Power Forecasting — LSTM-CNN")
