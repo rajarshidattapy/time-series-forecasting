@@ -85,7 +85,6 @@ def load_saved_model():
 
 data = load_data()
 train = data[:"2018-10-28"]
-valid = data["2018-10-29":"2019-10-28"]
 
 st.caption(f"Dataset: {data.index.min().date()} to {data.index.max().date()} ({len(data)} days)")
 
@@ -104,6 +103,7 @@ if st.sidebar.button("Train and save model", type="primary"):
     with st.spinner(f"Training for {epochs} epochs on {X.shape[0]} samples..."):
         model = train_model(epochs, X, y)
     st.session_state["model"] = model
+    st.session_state.pop("forecast", None)
     load_saved_model.clear()
     st.sidebar.success(f"Model saved to {MODEL_PATH}.")
 
@@ -113,9 +113,39 @@ if "model" not in st.session_state:
 
 model = st.session_state["model"]
 
-X_input = train[-WINDOW:].day_power.values.reshape(1, WINDOW, 1)
-y_hat = model.predict(X_input, verbose=0)[0]
-y_true = valid.day_power.values
+forecast_dates = data.index[WINDOW:len(data) - WINDOW + 1]
+default_date = pd.Timestamp("2018-10-29")
+default_index = int(forecast_dates.searchsorted(default_date))
+default_index = min(default_index, len(forecast_dates) - 1)
+
+st.sidebar.divider()
+selected_forecast_date = st.sidebar.selectbox(
+    "Forecast start date",
+    options=forecast_dates,
+    index=default_index,
+    format_func=lambda date: date.strftime("%d %b %Y"),
+    help="The model uses the preceding 365 days of solar-power data to forecast the next 365 days.",
+)
+
+if st.sidebar.button("Predict next 365 days", type="primary"):
+    start_position = data.index.get_loc(selected_forecast_date)
+    X_input = data.iloc[start_position - WINDOW:start_position].day_power.values
+    y_hat = model.predict(X_input.reshape(1, WINDOW, 1), verbose=0)[0]
+    y_true = data.iloc[start_position:start_position + WINDOW].day_power.values
+    st.session_state["forecast"] = {
+        "start_date": selected_forecast_date,
+        "y_hat": y_hat,
+        "y_true": y_true,
+    }
+
+if "forecast" not in st.session_state:
+    st.info("Select a forecast start date in the sidebar, then click **Predict next 365 days**.")
+    st.stop()
+
+forecast = st.session_state["forecast"]
+y_hat = forecast["y_hat"]
+y_true = forecast["y_true"]
+st.subheader(f"Forecast from {forecast['start_date'].date()} (next 365 days)")
 
 col1, col2 = st.columns(2)
 
